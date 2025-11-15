@@ -26,9 +26,7 @@ import {
   Alert as AlertType, 
   Settings,
   InsertSettings,
-
-  TrendData,
-  ExportFormat
+  TrendData
 } from "@shared/schema";
 
 function AppContent() {
@@ -38,7 +36,6 @@ function AppContent() {
   const [isOnline, setIsOnline] = useState(navigator.onLine);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [exportOpen, setExportOpen] = useState(false);
-  const [isExporting, setIsExporting] = useState(false);
 
   // Ensure we default to dashboard on first load
   useEffect(() => {
@@ -457,64 +454,6 @@ function AppContent() {
       }
     })();
   };
-  const handleExport = async (format: ExportFormat) => {
-    setIsExporting(true);
-    try {
-      toast({
-        title: "Exporting Data",
-        description: `Preparing ${format.toUpperCase()} file...`,
-      });
-
-      const response = await fetch(`/api/export?format=${format}`, {
-        method: "GET",
-        credentials: "include",
-      });
-
-      if (!response.ok) {
-        throw new Error(`Export failed: ${response.statusText}`);
-      }
-
-      // Get the filename from Content-Disposition header or generate one
-      const contentDisposition = response.headers.get("Content-Disposition");
-      let filename = `climaneer-export-${Date.now()}.${format}`;
-      if (contentDisposition) {
-        const filenameMatch = contentDisposition.match(/filename="?(.+)"?/);
-        if (filenameMatch) {
-          filename = filenameMatch[1];
-        }
-      }
-
-      // Get the blob data
-      const blob = await response.blob();
-      
-      // Create a download link and trigger it
-      const url = window.URL.createObjectURL(blob);
-      const link = document.createElement("a");
-      link.href = url;
-      link.download = filename;
-      document.body.appendChild(link);
-      link.click();
-      
-      // Cleanup
-      document.body.removeChild(link);
-      window.URL.revokeObjectURL(url);
-
-      toast({
-        title: "Export Complete",
-        description: `Downloaded ${filename}`,
-      });
-      setExportOpen(false);
-    } catch (error: any) {
-      console.error("Export error:", error);
-      toast({
-        title: "Export Failed",
-        description: error.message || "Failed to export data",
-        variant: "destructive",
-      });
-    } finally {
-      setIsExporting(false);
-    }
-  };
 
   const handleAlertDismiss = (id: string) => {
     setAlerts(prev => prev.filter(a => a.id !== id));
@@ -869,8 +808,7 @@ function AppContent() {
       <ExportModal 
         open={exportOpen}
         onOpenChange={setExportOpen}
-        onExport={handleExport}
-        isExporting={isExporting}
+        history={history}
       />
 
       {/* Toast Notifications */}
