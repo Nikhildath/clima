@@ -6,11 +6,18 @@ type HistoryEntry = {
   sensors: SensorReading;
 };
 import { Button } from "@/components/ui/button";
-import { Download, Search } from "lucide-react";
+import { Download, Search, FileSpreadsheet, FileJson } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { useState } from "react";
 import { format } from "date-fns";
 import { Card } from "@/components/ui/card";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { useToast } from "@/hooks/use-toast";
 
 interface HistoryProps {
   history: HistoryEntry[];
@@ -19,6 +26,7 @@ interface HistoryProps {
 
 export function History({ history, onExport }: HistoryProps) {
   const [searchQuery, setSearchQuery] = useState("");
+  const { toast } = useToast();
 
   const filteredHistory = history.filter((entry) => {
     const searchLower = searchQuery.toLowerCase();
@@ -27,6 +35,128 @@ export function History({ history, onExport }: HistoryProps) {
       entry.sensors.soilMoisture.toString().includes(searchLower)
     );
   });
+
+  // Export history as CSV
+  const exportAsCSV = () => {
+    if (filteredHistory.length === 0) {
+      toast({
+        title: "No Data",
+        description: "There is no history data to export",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Helper function to escape CSV values
+    const escapeCsvValue = (value: any): string => {
+      if (value === null || value === undefined) {
+        return "";
+      }
+      const str = String(value);
+      // If value contains comma, quote, or newline, wrap in quotes and escape quotes
+      if (str.includes(",") || str.includes('"') || str.includes("\n")) {
+        return `"${str.replace(/"/g, '""')}"`;
+      }
+      return str;
+    };
+
+    // CSV headers
+    const headers = [
+      "Timestamp",
+      "Soil Moisture (%)",
+      "Air Humidity (%)",
+      "Temperature (°C)",
+      "pH Level",
+      "Water Level (%)",
+      "Air Quality",
+      "Water Temperature (°C)",
+      "Flow Rate (L/min)",
+      "Battery (%)"
+    ];
+
+    // Convert history entries to CSV rows
+    const rows = filteredHistory.map((entry) => [
+      escapeCsvValue(entry.timestamp),
+      escapeCsvValue(entry.sensors.soilMoisture),
+      escapeCsvValue(entry.sensors.airHumidity),
+      escapeCsvValue(entry.sensors.airTemperature),
+      escapeCsvValue(entry.sensors.pH ?? 0),
+      escapeCsvValue(entry.sensors.waterLevel),
+      escapeCsvValue(entry.sensors.airQuality),
+      escapeCsvValue(entry.sensors.waterTemperature),
+      escapeCsvValue(entry.sensors.flowRate),
+      escapeCsvValue(entry.sensors.battery),
+    ]);
+
+    // Combine headers and rows
+    const csvContent = [headers.join(","), ...rows.map((row) => row.join(","))].join("\n");
+
+    // Create blob and download
+    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `climaneer-history-${Date.now()}.csv`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+
+    toast({
+      title: "Export Complete",
+      description: `Exported ${filteredHistory.length} entries as CSV`,
+    });
+  };
+
+  // Export history as JSON
+  const exportAsJSON = () => {
+    if (filteredHistory.length === 0) {
+      toast({
+        title: "No Data",
+        description: "There is no history data to export",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Format history data for JSON export
+    const exportData = {
+      exportedAt: new Date().toISOString(),
+      totalEntries: filteredHistory.length,
+      history: filteredHistory.map((entry) => ({
+        id: entry.id,
+        timestamp: entry.timestamp,
+        sensors: {
+          soilMoisture: entry.sensors.soilMoisture,
+          airHumidity: entry.sensors.airHumidity,
+          airTemperature: entry.sensors.airTemperature,
+          pH: entry.sensors.pH ?? 0,
+          waterLevel: entry.sensors.waterLevel,
+          airQuality: entry.sensors.airQuality,
+          waterTemperature: entry.sensors.waterTemperature,
+          flowRate: entry.sensors.flowRate,
+          battery: entry.sensors.battery,
+        },
+      })),
+    };
+
+    // Create blob and download
+    const jsonContent = JSON.stringify(exportData, null, 2);
+    const blob = new Blob([jsonContent], { type: "application/json;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `climaneer-history-${Date.now()}.json`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+
+    toast({
+      title: "Export Complete",
+      description: `Exported ${filteredHistory.length} entries as JSON`,
+    });
+  };
 
   return (
     <div className="container mx-auto p-4 sm:p-6 lg:p-8 space-y-6 pb-24">
@@ -37,14 +167,27 @@ export function History({ history, onExport }: HistoryProps) {
           <p className="text-muted-foreground">{history.length} recorded entries</p>
         </div>
         
-        <Button
-          onClick={onExport}
-          className="bg-gradient-to-r from-emerald-600 to-emerald-500"
-          data-testid="button-export-data"
-        >
-          <Download className="h-4 w-4 mr-2" />
-          Export Data
-        </Button>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button
+              className="bg-gradient-to-r from-emerald-600 to-emerald-500"
+              data-testid="button-export-data"
+            >
+              <Download className="h-4 w-4 mr-2" />
+              Export Data
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            <DropdownMenuItem onClick={exportAsCSV} data-testid="export-csv">
+              <FileSpreadsheet className="h-4 w-4 mr-2 text-emerald-500" />
+              Export as CSV
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={exportAsJSON} data-testid="export-json">
+              <FileJson className="h-4 w-4 mr-2 text-cyan-500" />
+              Export as JSON
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
 
       {/* Search */}
