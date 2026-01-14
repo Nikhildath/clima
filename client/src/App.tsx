@@ -45,7 +45,7 @@ function AppContent() {
   }, [location, setLocation]);
 
   // Live data from Firebase Realtime Database (REST API)
-  const FIREBASE_URL = "https://clima-f7a0d-default-rtdb.firebaseio.com/";
+  const FIREBASE_URL = "https://climaneeer-default-rtdb.asia-southeast1.firebasedatabase.app/";
 
   const [sensorData, setSensorData] = useState<SensorReading | undefined>(undefined);
   const [systemStatus, setSystemStatus] = useState<SystemStatus | undefined>(undefined);
